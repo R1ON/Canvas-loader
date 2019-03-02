@@ -10,19 +10,20 @@ class PageContainer extends PureComponent {
 
   componentDidMount() {
     const { current } = this.canvas;
+    const { innerWidth, innerHeight } = window;
 
-    const context = current.getContext('2d');
-    context.fillStyle = '#f00';
-    context.fillRect(0, 0, 300, 300);
-    context.save();
+    this.ctx = current.getContext('2d');
+    this.ctx.fillStyle = '#0d380d';
+    this.ctx.fillRect(0, 0, innerWidth, innerHeight);
+    this.ctx.save();
   }
 
   render() {
     return (
       <div className="page">
-        <header className="page__header">Liquid Cat</header>
+        {/*<header className="page__header">Liquid Cat</header>*/}
         <main className="page__main">
-          <canvas ref={this.canvas} width={300} height={300} />
+          <canvas ref={this.canvas} />
         </main>
       </div>
     );
