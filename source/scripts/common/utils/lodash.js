@@ -1,5 +1,5 @@
-// import get from 'lodash/get';
+import throttle from 'lodash/throttle';
 
-// export {
-//   get
-// };
+export {
+  throttle,
+};

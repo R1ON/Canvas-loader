@@ -1,2 +1,2 @@
-# Liquid-Cat
-Canvas demo about liquid cat
+# Canvas loader
+Canvas loader
