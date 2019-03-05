@@ -5,5 +5,4 @@ import PageContainer from './containers';
 
 import '../styles/index.sass';
 
-
 render(<PageContainer />, document.getElementById('root'));
