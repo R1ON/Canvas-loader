@@ -44,7 +44,9 @@ class PageContainer extends PureComponent {
   };
 
   drawArc = () => {
-    const { width, height, radius, offset } = this.state;
+    const {
+      width, height, radius, offset,
+    } = this.state;
 
     const halfWidth = width / 2;
     const halfHeight = height / 2;
