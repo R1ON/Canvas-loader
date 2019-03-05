@@ -24,7 +24,6 @@ class PageContainer extends PureComponent {
   }
 
   componentDidMount() {
-    const { innerWidth, innerHeight } = window;
     const { current } = this.canvas;
 
     this.ctx = current.getContext('2d');
