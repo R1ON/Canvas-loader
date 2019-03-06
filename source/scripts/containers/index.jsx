@@ -8,18 +8,20 @@ class PageContainer extends PureComponent {
     super();
 
     this.state = {
+      cancelAnimationFrame: false,
+      animationId: 0,
       width: window.innerWidth,
       height: window.innerHeight,
       radius: 100,
       offset: 0.1, // TODO: менять оффсет,
       // radius: Math.sqrt((window.innerWidth ** 2) + (window.innerHeight ** 2)) / 2,
+      rotateValue: 0,
     };
 
     this.canvas = createRef();
 
-    const drawCanvasWithThrottle = throttle(this.drawCanvas, 300);
+    const drawCanvasWithThrottle = throttle(this.redrawCanvas, 300);
 
-    // TODO завершить предыдущий рендер и начать этот с той позиции
     window.onresize = () => drawCanvasWithThrottle();
   }
 
@@ -30,48 +32,74 @@ class PageContainer extends PureComponent {
     this.drawCanvas();
   }
 
+  redrawCanvas = () => {
+    const { animationId } = this.state;
+
+    cancelAnimationFrame(animationId);
+    this.setState({ cancelAnimationFrame: true });
+    this.drawCanvas();
+  };
+
   drawCanvas = () => {
     const { innerWidth, innerHeight } = window;
 
     this.setState({ width: innerWidth, height: innerHeight });
-
     requestAnimationFrame(this.drawArc);
   };
 
   clearCanvas = (width, height) => {
     this.ctx.clearRect(0, 0, width, height);
-    // this.ctx.rotate(Math.PI / 180);
   };
 
-  drawArc = () => {
+  rotateCanvas = () => {
     const {
-      width, height, radius, offset,
+      width, height, rotateValue, cancelAnimationFrame,
     } = this.state;
+
+    this.ctx.translate(width / 2, height / 2);
+
+    if (cancelAnimationFrame) {
+      this.ctx.rotate(rotateValue);
+    } else {
+      this.ctx.rotate(Math.PI / 180);
+    }
+
+    // TODO: запоминать позицию scale как и с rotate
+    // this.ctx.scale(0.98, 0.98);
+    this.ctx.translate(-width / 2, -height / 2);
+    this.setState(prevState => ({
+      cancelAnimationFrame: false,
+      rotateValue: prevState.rotateValue + Math.PI / 180,
+    }));
+  };
+
+  drawPart = (startAngle, endAngle) => {
+    const { width, height, radius } = this.state;
 
     const halfWidth = width / 2;
     const halfHeight = height / 2;
 
+    this.ctx.beginPath();
+    this.ctx.arc(halfWidth, halfHeight, radius, startAngle, endAngle);
+    this.ctx.lineWidth = 10;
+    this.ctx.lineCap = 'round';
+    this.ctx.strokeStyle = '#000066';
+    this.ctx.stroke();
+  };
+
+  drawArc = () => {
+    const { width, height, offset } = this.state;
+
     this.clearCanvas(width, height);
+    this.rotateCanvas(width, height);
 
-    // TODO перенести этот транслейт, чтобы все было по центру и имело сглаживание
-    this.ctx.translate(width / 2, height / 2);
+    this.drawPart(offset, Math.PI / 2 - offset);
+    this.drawPart(Math.PI / 2 + offset, Math.PI - offset);
+    this.drawPart(Math.PI + offset, Math.PI + Math.PI / 2 - offset);
+    this.drawPart(Math.PI + Math.PI / 2 + offset, Math.PI * 2 - offset);
 
-    const drawPart = (startAngle, endAngle) => {
-      this.ctx.beginPath();
-      this.ctx.arc(0, 0, radius, startAngle, endAngle);
-      this.ctx.lineWidth = 10;
-      this.ctx.lineCap = 'round';
-      this.ctx.strokeStyle = '#000066';
-      this.ctx.stroke();
-    };
-
-
-    drawPart(offset, Math.PI / 2 - offset);
-    drawPart(Math.PI / 2 + offset, Math.PI - offset);
-    drawPart(Math.PI + offset, Math.PI + Math.PI / 2 - offset);
-    drawPart(Math.PI + Math.PI / 2 + offset, Math.PI * 2 - offset);
-
-    requestAnimationFrame(this.drawArc);
+    const animationId = requestAnimationFrame(this.drawArc);
+    this.setState({ animationId });
   };
 
   render() {
