@@ -3,6 +3,8 @@ import React, { PureComponent, createRef } from 'react';
 
 import { throttle } from 'common/utils/lodash';
 
+const DEFAULT_ROTATE_VALUE = Math.PI / 100;
+
 class PageContainer extends PureComponent {
   constructor() {
     super();
@@ -12,9 +14,9 @@ class PageContainer extends PureComponent {
       animationId: 0,
       width: window.innerWidth,
       height: window.innerHeight,
-      radius: 100,
-      offset: 0.1, // TODO: менять оффсет,
-      // radius: Math.sqrt((window.innerWidth ** 2) + (window.innerHeight ** 2)) / 2,
+      // radius: 100,
+      offset: 0.1,
+      radius: Math.sqrt((window.innerWidth ** 2) + (window.innerHeight ** 2)) / 2,
       rotateValue: 0,
     };
 
@@ -47,7 +49,9 @@ class PageContainer extends PureComponent {
     requestAnimationFrame(this.drawArc);
   };
 
-  clearCanvas = (width, height) => {
+  clearCanvas = () => {
+    const { width, height } = this.state;
+
     this.ctx.clearRect(0, 0, width, height);
   };
 
@@ -58,18 +62,20 @@ class PageContainer extends PureComponent {
 
     this.ctx.translate(width / 2, height / 2);
 
+    this.ctx.clearRect(-width, -height, width * 2, height * 2);
+
     if (cancelAnimationFrame) {
       this.ctx.rotate(rotateValue);
     } else {
-      this.ctx.rotate(Math.PI / 180);
+      this.ctx.rotate(DEFAULT_ROTATE_VALUE);
     }
 
-    // TODO: запоминать позицию scale как и с rotate
-    // this.ctx.scale(0.98, 0.98);
     this.ctx.translate(-width / 2, -height / 2);
+
     this.setState(prevState => ({
       cancelAnimationFrame: false,
-      rotateValue: prevState.rotateValue + Math.PI / 180,
+      rotateValue: prevState.rotateValue + DEFAULT_ROTATE_VALUE,
+      radius: prevState.radius - 5 - (prevState.radius * 0.05),
     }));
   };
 
@@ -81,16 +87,18 @@ class PageContainer extends PureComponent {
 
     this.ctx.beginPath();
     this.ctx.arc(halfWidth, halfHeight, radius, startAngle, endAngle);
-    this.ctx.lineWidth = 10;
+    this.ctx.lineWidth = 30;
     this.ctx.lineCap = 'round';
     this.ctx.strokeStyle = '#000066';
     this.ctx.stroke();
   };
 
   drawArc = () => {
-    const { width, height, offset } = this.state;
+    const {
+      width, height, offset, radius,
+    } = this.state;
 
-    this.clearCanvas(width, height);
+    this.clearCanvas();
     this.rotateCanvas(width, height);
 
     this.drawPart(offset, Math.PI / 2 - offset);
@@ -99,6 +107,11 @@ class PageContainer extends PureComponent {
     this.drawPart(Math.PI + Math.PI / 2 + offset, Math.PI * 2 - offset);
 
     const animationId = requestAnimationFrame(this.drawArc);
+
+    if (radius <= 20) {
+      cancelAnimationFrame(animationId);
+    }
+
     this.setState({ animationId });
   };
 
