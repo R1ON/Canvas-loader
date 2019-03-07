@@ -3,26 +3,43 @@ import React, { PureComponent, createRef } from 'react';
 
 import { throttle } from 'common/utils/lodash';
 
-const DEFAULT_ROTATE_VALUE = Math.PI / 100;
+import {
+  PART_COLOR,
+  PART_LINE_WIDTH,
+  MIN_RADIUS_VALUE,
+  RADIUS_RANGE,
+  RADIUS_SPEED,
+  RADIUS_ACCELERATION,
+  DEFAULT_ROTATE_VALUE,
+  OFFSET_SPEED,
+  DEFAULT_OFFSET_VALUE,
+  REDRAW_CANVAS_TIME,
+} from '../constants/settings';
 
 class PageContainer extends PureComponent {
   constructor() {
     super();
 
+    this.ratio = window.devicePixelRatio;
+
+    const width = window.innerWidth * this.ratio;
+    const height = window.innerHeight * this.ratio;
+
     this.state = {
-      cancelAnimationFrame: false,
+      width,
+      height,
       animationId: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-      // radius: 100,
-      offset: 0.1,
-      radius: Math.sqrt((window.innerWidth ** 2) + (window.innerHeight ** 2)) / 2,
       rotateValue: 0,
+      radiusAcceleration: 0,
+      offset: DEFAULT_OFFSET_VALUE,
+      radius: Math.sqrt((width ** 2) + (height ** 2)) / RADIUS_RANGE, // device diagonal
+      cancelNextAnimationFrame: false,
+      cancelAnimationFrame: false,
     };
 
     this.canvas = createRef();
 
-    const drawCanvasWithThrottle = throttle(this.redrawCanvas, 300);
+    const drawCanvasWithThrottle = throttle(this.redrawCanvas, REDRAW_CANVAS_TIME);
 
     window.onresize = () => drawCanvasWithThrottle();
   }
@@ -31,21 +48,22 @@ class PageContainer extends PureComponent {
     const { current } = this.canvas;
 
     this.ctx = current.getContext('2d');
-    this.drawCanvas();
+
+    requestAnimationFrame(this.drawArc);
   }
 
   redrawCanvas = () => {
+    const { innerWidth, innerHeight } = window;
     const { animationId } = this.state;
 
     cancelAnimationFrame(animationId);
-    this.setState({ cancelAnimationFrame: true });
-    this.drawCanvas();
-  };
 
-  drawCanvas = () => {
-    const { innerWidth, innerHeight } = window;
+    this.setState({
+      cancelAnimationFrame: true,
+      width: innerWidth * this.ratio,
+      height: innerHeight * this.ratio,
+    });
 
-    this.setState({ width: innerWidth, height: innerHeight });
     requestAnimationFrame(this.drawArc);
   };
 
@@ -55,31 +73,53 @@ class PageContainer extends PureComponent {
     this.ctx.clearRect(0, 0, width, height);
   };
 
+  clearRotatingCanvas = () => {
+    const { width, height, radius } = this.state;
+
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+
+    this.clearCanvas();
+
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.arc(halfWidth, halfHeight, radius + PART_LINE_WIDTH, 0, Math.PI * 2);
+    this.ctx.fill();
+  };
+
   rotateCanvas = () => {
     const {
-      width, height, rotateValue, cancelAnimationFrame,
+      width, height, rotateValue, cancelAnimationFrame, cancelNextAnimationFrame,
     } = this.state;
 
-    this.ctx.translate(width / 2, height / 2);
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
 
-    this.ctx.clearRect(-width, -height, width * 2, height * 2);
+    this.clearRotatingCanvas();
 
-    if (cancelAnimationFrame) {
+    this.ctx.translate(halfWidth, halfHeight);
+
+    if (cancelAnimationFrame || cancelNextAnimationFrame) {
       this.ctx.rotate(rotateValue);
     } else {
       this.ctx.rotate(DEFAULT_ROTATE_VALUE);
     }
 
-    this.ctx.translate(-width / 2, -height / 2);
+    this.ctx.translate(-halfWidth, -halfHeight);
 
-    this.setState(prevState => ({
-      cancelAnimationFrame: false,
-      rotateValue: prevState.rotateValue + DEFAULT_ROTATE_VALUE,
-      radius: prevState.radius - 5 - (prevState.radius * 0.05),
-    }));
+    this.setState((prevState) => {
+      const newRadiusValue = prevState.radius - RADIUS_SPEED - prevState.radiusAcceleration;
+
+      return ({
+        cancelAnimationFrame: false,
+        offset: prevState.offset - OFFSET_SPEED,
+        rotateValue: prevState.rotateValue + DEFAULT_ROTATE_VALUE,
+        radius: cancelNextAnimationFrame ? MIN_RADIUS_VALUE : newRadiusValue,
+        radiusAcceleration: prevState.radiusAcceleration + RADIUS_ACCELERATION,
+      });
+    });
   };
 
-  drawPart = (startAngle, endAngle) => {
+  drawOnePart = (startAngle, endAngle) => {
     const { width, height, radius } = this.state;
 
     const halfWidth = width / 2;
@@ -87,32 +127,33 @@ class PageContainer extends PureComponent {
 
     this.ctx.beginPath();
     this.ctx.arc(halfWidth, halfHeight, radius, startAngle, endAngle);
-    this.ctx.lineWidth = 30;
+    this.ctx.lineWidth = 20;
     this.ctx.lineCap = 'round';
-    this.ctx.strokeStyle = '#000066';
+    this.ctx.strokeStyle = PART_COLOR;
     this.ctx.stroke();
   };
 
   drawArc = () => {
     const {
-      width, height, offset, radius,
+      radius, offset, animationId: id, radiusAcceleration, cancelNextAnimationFrame,
     } = this.state;
 
-    this.clearCanvas();
-    this.rotateCanvas(width, height);
-
-    this.drawPart(offset, Math.PI / 2 - offset);
-    this.drawPart(Math.PI / 2 + offset, Math.PI - offset);
-    this.drawPart(Math.PI + offset, Math.PI + Math.PI / 2 - offset);
-    this.drawPart(Math.PI + Math.PI / 2 + offset, Math.PI * 2 - offset);
-
-    const animationId = requestAnimationFrame(this.drawArc);
-
-    if (radius <= 20) {
-      cancelAnimationFrame(animationId);
+    if ((radius - RADIUS_SPEED - radiusAcceleration) < MIN_RADIUS_VALUE) {
+      this.setState({ animationId: id, cancelNextAnimationFrame: true, radius: MIN_RADIUS_VALUE });
+      cancelAnimationFrame(id);
     }
 
-    this.setState({ animationId });
+    this.rotateCanvas();
+
+    this.drawOnePart(offset, Math.PI / 2 - offset);
+    this.drawOnePart(Math.PI / 2 + offset, Math.PI - offset);
+    this.drawOnePart(Math.PI + offset, Math.PI + Math.PI / 2 - offset);
+    this.drawOnePart(Math.PI + Math.PI / 2 + offset, Math.PI * 2 - offset);
+
+    if (!cancelNextAnimationFrame) {
+      const animationId = requestAnimationFrame(this.drawArc);
+      this.setState({ animationId });
+    }
   };
 
   render() {
