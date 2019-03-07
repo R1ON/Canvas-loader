@@ -6,6 +6,7 @@ import { throttle } from 'common/utils/lodash';
 import {
   PART_COLOR,
   PART_LINE_WIDTH,
+  BACKGROUND_COLOR,
   MIN_RADIUS_VALUE,
   RADIUS_RANGE,
   RADIUS_SPEED,
@@ -25,15 +26,17 @@ class PageContainer extends PureComponent {
     const width = window.innerWidth * this.ratio;
     const height = window.innerHeight * this.ratio;
 
+    this.deviceDiagonal = Math.sqrt((width ** 2) + (height ** 2)) / RADIUS_RANGE;
+
     this.state = {
       width,
       height,
+      animationPart: 1,
       animationId: 0,
       rotateValue: 0,
       radiusAcceleration: 0,
       offset: DEFAULT_OFFSET_VALUE,
-      radius: Math.sqrt((width ** 2) + (height ** 2)) / RADIUS_RANGE, // device diagonal
-      cancelNextAnimationFrame: false,
+      radius: this.deviceDiagonal,
       cancelAnimationFrame: false,
     };
 
@@ -49,7 +52,7 @@ class PageContainer extends PureComponent {
 
     this.ctx = current.getContext('2d');
 
-    requestAnimationFrame(this.drawArc);
+    requestAnimationFrame(this.drawAnimationParts);
   }
 
   redrawCanvas = () => {
@@ -64,7 +67,7 @@ class PageContainer extends PureComponent {
       height: innerHeight * this.ratio,
     });
 
-    requestAnimationFrame(this.drawArc);
+    requestAnimationFrame(this.drawAnimationParts);
   };
 
   clearCanvas = () => {
@@ -81,14 +84,14 @@ class PageContainer extends PureComponent {
 
     this.clearCanvas();
 
-    this.ctx.fillStyle = '#ffffff';
+    this.ctx.fillStyle = BACKGROUND_COLOR;
     this.ctx.arc(halfWidth, halfHeight, radius + PART_LINE_WIDTH, 0, Math.PI * 2);
     this.ctx.fill();
   };
 
   rotateCanvas = () => {
     const {
-      width, height, rotateValue, cancelAnimationFrame, cancelNextAnimationFrame,
+      width, height, rotateValue, cancelAnimationFrame,
     } = this.state;
 
     const halfWidth = width / 2;
@@ -98,7 +101,7 @@ class PageContainer extends PureComponent {
 
     this.ctx.translate(halfWidth, halfHeight);
 
-    if (cancelAnimationFrame || cancelNextAnimationFrame) {
+    if (cancelAnimationFrame) {
       this.ctx.rotate(rotateValue);
     } else {
       this.ctx.rotate(DEFAULT_ROTATE_VALUE);
@@ -113,7 +116,7 @@ class PageContainer extends PureComponent {
         cancelAnimationFrame: false,
         offset: prevState.offset - OFFSET_SPEED,
         rotateValue: prevState.rotateValue + DEFAULT_ROTATE_VALUE,
-        radius: cancelNextAnimationFrame ? MIN_RADIUS_VALUE : newRadiusValue,
+        radius: newRadiusValue,
         radiusAcceleration: prevState.radiusAcceleration + RADIUS_ACCELERATION,
       });
     });
@@ -133,26 +136,75 @@ class PageContainer extends PureComponent {
     this.ctx.stroke();
   };
 
-  drawArc = () => {
-    const {
-      radius, offset, animationId: id, radiusAcceleration, cancelNextAnimationFrame,
-    } = this.state;
+  secondAnimationPart = () => {
+    const { width, height, radius } = this.state;
+
+    if (radius > this.deviceDiagonal) {
+      this.setState(prevState => ({ animationPart: prevState.animationPart + 1 }));
+    } else {
+      const halfWidth = width / 2;
+      const halfHeight = height / 2;
+
+      this.ctx.fillStyle = PART_COLOR;
+      this.ctx.strokeStyle = PART_COLOR;
+      this.ctx.arc(halfWidth, halfHeight, radius, 0, Math.PI * 2);
+
+      this.ctx.fill();
+      this.ctx.stroke();
+
+      // TODO вызывать функцию, которая рисует этот круг
+      // и когда происходит вызов третьей части,
+      // то брать уже рассчитанные ранее значения
+
+      // this.ctx.beginPath();
+      // this.ctx.strokeStyle = BACKGROUND_COLOR;
+      // this.ctx.lineWidth = 3;
+      // this.ctx.arc(halfWidth, halfHeight, radius > 100 ? 100 : radius - 1, 0, Math.PI * 2);
+      // this.ctx.stroke();
+
+      this.setState({ radius: radius + 30 });
+    }
+  };
+
+  firstAnimationPart = () => {
+    const { radius, offset, radiusAcceleration } = this.state;
 
     if ((radius - RADIUS_SPEED - radiusAcceleration) < MIN_RADIUS_VALUE) {
-      this.setState({ animationId: id, cancelNextAnimationFrame: true, radius: MIN_RADIUS_VALUE });
-      cancelAnimationFrame(id);
+      this.setState(prevState => ({
+        animationPart: prevState.animationPart + 1,
+        radius: MIN_RADIUS_VALUE,
+      }));
+    } else {
+      this.rotateCanvas();
+
+      this.drawOnePart(offset, Math.PI / 2 - offset); // IV quadrant
+      this.drawOnePart(Math.PI / 2 + offset, Math.PI - offset); // III quadrant
+      this.drawOnePart(Math.PI + offset, Math.PI + Math.PI / 2 - offset); // II quadrant
+      this.drawOnePart(Math.PI + Math.PI / 2 + offset, Math.PI * 2 - offset); // I quadrant
+    }
+  };
+
+  drawAnimationParts = () => {
+    const { animationPart, width, height } = this.state;
+
+    switch (animationPart) {
+      case 1:
+        this.firstAnimationPart();
+        break;
+      case 2:
+        // TODO добавить ускорение, т.к. на больших мониторах слишком долго
+        this.secondAnimationPart();
+        break;
+
+      default: break;
     }
 
-    this.rotateCanvas();
-
-    this.drawOnePart(offset, Math.PI / 2 - offset);
-    this.drawOnePart(Math.PI / 2 + offset, Math.PI - offset);
-    this.drawOnePart(Math.PI + offset, Math.PI + Math.PI / 2 - offset);
-    this.drawOnePart(Math.PI + Math.PI / 2 + offset, Math.PI * 2 - offset);
-
-    if (!cancelNextAnimationFrame) {
-      const animationId = requestAnimationFrame(this.drawArc);
+    if (animationPart !== 3) {
+      const animationId = requestAnimationFrame(this.drawAnimationParts);
       this.setState({ animationId });
+    } else {
+      this.ctx.fillStyle = PART_COLOR;
+      this.ctx.fillRect(0, 0, width, height);
     }
   };
 
