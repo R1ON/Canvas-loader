@@ -20,5 +20,9 @@
         "config": "webpack.config.js"
       }
     }
+  },
+  "rules": {
+    "linebreak-style": 0,
+    "react/require-default-props": "off"
   }
 }

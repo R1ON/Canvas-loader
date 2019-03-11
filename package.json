@@ -5,8 +5,8 @@
   "main": "index.js",
   "author": "R1ON",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development webpack-dev-server --mode development --open",
-    "prod": "cross-env NODE_ENV=production webpack --mode production"
+    "start": "cross-env NODE_ENV=development webpack-dev-server --mode development --open",
+    "build": "cross-env NODE_ENV=production webpack --mode production"
   },
   "devDependencies": {
     "@babel/cli": "7.2.3",
@@ -43,7 +43,6 @@
     "webpack-merge": "4.2.1"
   },
   "dependencies": {
-    "@reach/router": "^1.2.1",
     "classnames": "2.2.6",
     "lodash": "4.17.10",
     "normalize.css": "8.0.1",
