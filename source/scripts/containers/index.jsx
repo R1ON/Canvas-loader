@@ -113,10 +113,10 @@ class PageContainer extends PureComponent {
       const newRadiusValue = prevState.radius - RADIUS_SPEED - prevState.radiusAcceleration;
 
       return ({
+        radius: newRadiusValue,
         cancelAnimationFrame: false,
         offset: prevState.offset - OFFSET_SPEED,
         rotateValue: prevState.rotateValue + DEFAULT_ROTATE_VALUE,
-        radius: newRadiusValue,
         radiusAcceleration: prevState.radiusAcceleration + RADIUS_ACCELERATION,
       });
     });
@@ -145,12 +145,10 @@ class PageContainer extends PureComponent {
       const halfWidth = width / 2;
       const halfHeight = height / 2;
 
+      this.ctx.beginPath();
       this.ctx.fillStyle = PART_COLOR;
-      this.ctx.strokeStyle = PART_COLOR;
       this.ctx.arc(halfWidth, halfHeight, radius, 0, Math.PI * 2);
-
       this.ctx.fill();
-      this.ctx.stroke();
 
       // TODO вызывать функцию, которая рисует этот круг
       // и когда происходит вызов третьей части,
@@ -170,6 +168,7 @@ class PageContainer extends PureComponent {
     const { radius, offset, radiusAcceleration } = this.state;
 
     if ((radius - RADIUS_SPEED - radiusAcceleration) < MIN_RADIUS_VALUE) {
+      this.clearRotatingCanvas();
       this.setState(prevState => ({
         animationPart: prevState.animationPart + 1,
         radius: MIN_RADIUS_VALUE,
