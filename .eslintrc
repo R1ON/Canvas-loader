@@ -23,6 +23,7 @@
   },
   "rules": {
     "linebreak-style": 0,
-    "react/require-default-props": "off"
+    "react/require-default-props": "off",
+    "max-len": "off"
   }
 }

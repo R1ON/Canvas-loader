@@ -24,18 +24,21 @@ import {
   DEFAULT_OFFSET_VALUE,
   REDRAW_CANVAS_TIME,
   ANIMATION_PART,
+  BOUNCE_DURATION,
+  FPS,
 } from '../constants/settings';
 
 class PageContainer extends PureComponent {
   constructor() {
     super();
 
+    this.canvas = createRef();
     this.ratio = window.devicePixelRatio;
 
     const width = window.innerWidth * this.ratio;
     const height = window.innerHeight * this.ratio;
 
-    this.deviceDiagonal = Math.sqrt((width ** 2) + (height ** 2)) / RADIUS_RANGE;
+    this.deviceDiagonal = this.calculateDiagonal(width, height);
 
     this.state = {
       width,
@@ -46,15 +49,12 @@ class PageContainer extends PureComponent {
       radiusAcceleration: 0,
       loaderRadius: 0,
       loaderRotateValue: 0,
-      bounceTime: 5000,
-      bounceValue: 0,
-      searchKey: 0,
+      bounceRadius: LOADER_RADIUS,
+      bounceCurrentFrame: 0,
       offset: DEFAULT_OFFSET_VALUE,
       radius: this.deviceDiagonal,
       cancelAnimationFrame: false,
     };
-
-    this.canvas = createRef();
 
     const drawCanvasWithThrottle = throttle(this.redrawCanvas, REDRAW_CANVAS_TIME);
 
@@ -73,9 +73,13 @@ class PageContainer extends PureComponent {
     const { width, height } = this.state;
 
     if (prevState.width !== width || prevState.height !== height) {
-      this.deviceDiagonal = Math.sqrt((width ** 2) + (height ** 2)) / RADIUS_RANGE;
+      this.deviceDiagonal = this.calculateDiagonal(width, height);
     }
   }
+
+  calculateDiagonal = (width, height) => (
+    Math.sqrt((width ** 2) + (height ** 2)) / RADIUS_RANGE
+  );
 
   redrawCanvas = () => {
     const { innerWidth, innerHeight } = window;
@@ -119,8 +123,11 @@ class PageContainer extends PureComponent {
     const halfWidth = width / 2;
     const halfHeight = height / 2;
 
+    // because it draws a circle that rotates,
+    // you need to clean a canvas in a circle
     this.clearRotatingCanvas();
 
+    // TODO: try setTransform
     this.ctx.translate(halfWidth, halfHeight);
 
     if (cancelAnimationFrame) {
@@ -178,20 +185,24 @@ class PageContainer extends PureComponent {
   };
 
   drawLoader = (startAngle, endAngle) => {
-    const { width, height, loaderRadius } = this.state;
+    const {
+      width, height, loaderRadius, bounceRadius,
+    } = this.state;
+
+    const radius = loaderRadius >= LOADER_RADIUS ? bounceRadius : loaderRadius;
 
     this.ctx.beginPath();
 
     this.ctx.strokeStyle = BACKGROUND_COLOR;
     this.ctx.lineWidth = 4;
     this.ctx.lineCap = 'round';
-    this.ctx.arc(width / 2, height / 2, loaderRadius, startAngle, endAngle);
+    this.ctx.arc(width / 2, height / 2, radius, startAngle, endAngle);
     this.ctx.stroke();
   };
 
   secondAnimationPart = () => {
     const {
-      width, height, radius, loaderRadius, cancelAnimationFrame, rotateValue, loaderRotateValue,
+      width, height, radius, cancelAnimationFrame, rotateValue, loaderRotateValue, loaderRadius,
     } = this.state;
 
     const halfWidth = width / 2;
@@ -210,9 +221,7 @@ class PageContainer extends PureComponent {
 
     this.ctx.translate(-halfWidth, -halfHeight);
 
-    const gradient = this.ctx.createRadialGradient(
-      halfWidth, halfHeight, 0, halfWidth, halfHeight, radius,
-    );
+    const gradient = this.ctx.createRadialGradient(halfWidth, halfHeight, 0, halfWidth, halfHeight, radius);
     gradient.addColorStop(0, PART_COLOR);
     gradient.addColorStop(1, PART_COLOR_LIGHTER);
 
@@ -223,26 +232,17 @@ class PageContainer extends PureComponent {
     this.drawLoader(LOADER_OFFSET, Math.PI - LOADER_OFFSET);
     this.drawLoader(Math.PI + LOADER_OFFSET, Math.PI * 2 - LOADER_OFFSET);
 
-    // if (loaderRadius >= LOADER_RADIUS) {
-    //   this.bounce();
-    // }
+    if (loaderRadius >= LOADER_RADIUS) {
+      this.bounce();
+    }
 
     this.setState(prevState => ({
       cancelAnimationFrame: false,
-      radius: radius > this.deviceDiagonal ? prevState.radius : (
-        prevState.radius + SECOND_ANIMATION_RADIUS_SPEED
-      ) * SECOND_ANIMATION_RADIUS_ACCELERATION,
+      radius: radius > this.deviceDiagonal
+        ? prevState.radius
+        : (prevState.radius + SECOND_ANIMATION_RADIUS_SPEED) * SECOND_ANIMATION_RADIUS_ACCELERATION,
       loaderRadius: prevState.loaderRadius >= LOADER_RADIUS
         ? LOADER_RADIUS
-        // ? prevState.loaderRadius + 5 > 350
-        //   ? prevState.loaderRadius - 5 < 200
-        //     ? prevState.loaderRadius + 5 > 280
-        //       ? prevState.loaderRadius - 5 < 200
-        //         ? 200
-        //         : prevState.loaderRadius - 5
-        //       : prevState.loaderRadius + 5
-        //     : prevState.loaderRadius - 5
-        //   : prevState.loaderRadius + 5
         : (prevState.loaderRadius + LOADER_SPEED) * LOADER_ACCELERATION,
       loaderRotateValue: prevState.loaderRotateValue + DEFAULT_ROTATE_LOADER_VALUE,
       // animationPart: radius > this.deviceDiagonal
@@ -252,26 +252,26 @@ class PageContainer extends PureComponent {
   };
 
   bounce = () => {
-    const { bounceTime, searchKey, loaderRadius } = this.state;
+    const { bounceCurrentFrame } = this.state;
 
-    const keyframes = {
-      20: 250,
-      60: 200,
-    };
+    const animationDuration = parseInt(BOUNCE_DURATION / FPS, 10);
+    const frame = bounceCurrentFrame / animationDuration;
 
-    if (bounceTime < 0) {
+    // if you go to the last frame
+    if (animationDuration === (bounceCurrentFrame - 1)) {
       return;
     }
 
-    const keyframesKeys = Object.keys(keyframes);
-    const currentFrameValue = keyframes[keyframesKeys[searchKey]]; // get object value by key
+    // 0.3 ~ 30%
+    // need to pick up coefficients
+    const value = frame < 0.3
+      ? -15
+      : (frame < 0.5 ? 10 : 0);
 
-    const percentByKey = (5000 * (100 - keyframesKeys[searchKey]) / 100) - bounceTime >= 0;
 
     this.setState(prevState => ({
-      bounceTime: parseInt(prevState.bounceTime - 16, 10),
-      bounceValue: percentByKey ? currentFrameValue : prevState.bounceValue,
-      searchKey: percentByKey ? prevState.searchKey + 1 : prevState.searchKey,
+      bounceRadius: prevState.bounceRadius + value,
+      bounceCurrentFrame: prevState.bounceCurrentFrame + 1,
     }));
   };
 

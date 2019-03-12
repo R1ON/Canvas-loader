@@ -4,6 +4,9 @@ export const LOADER_ACCELERATION = 1.1;
 export const LOADER_OFFSET = 0.6;
 export const DEFAULT_ROTATE_LOADER_VALUE = Math.PI / 50;
 
+export const BOUNCE_DURATION = 1000;
+export const FPS = 60;
+
 export const RADIUS_SPEED = 5;
 export const RADIUS_ACCELERATION = 0.2;
 
