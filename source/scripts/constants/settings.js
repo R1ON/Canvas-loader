@@ -1,14 +1,16 @@
-export const LOADER_RADIUS = 200;
+export const LOADER_RADIUS = 150;
+export const MAX_LOADER_RADIUS = 200;
 export const LOADER_SPEED = 3;
 export const LOADER_ACCELERATION = 1.1;
 export const LOADER_OFFSET = 0.6;
 export const DEFAULT_ROTATE_LOADER_VALUE = Math.PI / 50;
 
-export const BOUNCE_DURATION = 1000;
-export const FPS = 60;
+export const PERCENT_OF_DESCREASE = 20;
+export const INCREASE_SPEED = 0.3;
+export const DESCREASE_SPEED_OF_INCREASE_SPEED = 0.005;
 
 export const RADIUS_SPEED = 5;
-export const RADIUS_ACCELERATION = 0.2;
+export const RADIUS_ACCELERATION = 0.000000000000002; // TODO: 0.2
 
 export const SECOND_ANIMATION_RADIUS_SPEED = 5;
 export const SECOND_ANIMATION_RADIUS_ACCELERATION = 1.15;

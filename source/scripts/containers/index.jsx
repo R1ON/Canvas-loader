@@ -12,10 +12,14 @@ import {
   RADIUS_RANGE,
   RADIUS_SPEED,
   LOADER_RADIUS,
+  MAX_LOADER_RADIUS,
   LOADER_SPEED,
   LOADER_OFFSET,
   LOADER_ACCELERATION,
   DEFAULT_ROTATE_LOADER_VALUE,
+  PERCENT_OF_DESCREASE,
+  INCREASE_SPEED,
+  DESCREASE_SPEED_OF_INCREASE_SPEED,
   RADIUS_ACCELERATION,
   SECOND_ANIMATION_RADIUS_SPEED,
   SECOND_ANIMATION_RADIUS_ACCELERATION,
@@ -24,8 +28,6 @@ import {
   DEFAULT_OFFSET_VALUE,
   REDRAW_CANVAS_TIME,
   ANIMATION_PART,
-  BOUNCE_DURATION,
-  FPS,
 } from '../constants/settings';
 
 class PageContainer extends PureComponent {
@@ -49,8 +51,8 @@ class PageContainer extends PureComponent {
       radiusAcceleration: 0,
       loaderRadius: 0,
       loaderRotateValue: 0,
-      bounceRadius: LOADER_RADIUS,
-      bounceCurrentFrame: 0,
+      increaseRadius: LOADER_RADIUS,
+      increaseSpeed: INCREASE_SPEED,
       offset: DEFAULT_OFFSET_VALUE,
       radius: this.deviceDiagonal,
       cancelAnimationFrame: false,
@@ -103,15 +105,16 @@ class PageContainer extends PureComponent {
   };
 
   clearRotatingCanvas = () => {
-    const { width, height, radius } = this.state;
+    const { width, height } = this.state;
 
     const halfWidth = width / 2;
     const halfHeight = height / 2;
 
     this.clearCanvas();
 
+    this.ctx.beginPath();
     this.ctx.fillStyle = BACKGROUND_COLOR;
-    this.ctx.arc(halfWidth, halfHeight, radius + PART_LINE_WIDTH, 0, Math.PI * 2);
+    this.ctx.arc(halfWidth, halfHeight, this.deviceDiagonal, 0, Math.PI * 2);
     this.ctx.fill();
   };
 
@@ -125,9 +128,12 @@ class PageContainer extends PureComponent {
 
     // because it draws a circle that rotates,
     // you need to clean a canvas in a circle
-    this.clearRotatingCanvas();
+    // this.clearRotatingCanvas();
 
-    // TODO: try setTransform
+    // TODO: нужно чистить через квадрат, чтобы он не перекрывал background белым цветом
+    const main = width > height ? width : height;
+    this.ctx.clearRect(-main * 2, -height * 2, main * 4, main * 4);
+
     this.ctx.translate(halfWidth, halfHeight);
 
     if (cancelAnimationFrame) {
@@ -186,10 +192,10 @@ class PageContainer extends PureComponent {
 
   drawLoader = (startAngle, endAngle) => {
     const {
-      width, height, loaderRadius, bounceRadius,
+      width, height, loaderRadius, increaseRadius,
     } = this.state;
 
-    const radius = loaderRadius >= LOADER_RADIUS ? bounceRadius : loaderRadius;
+    const radius = loaderRadius >= LOADER_RADIUS ? increaseRadius : loaderRadius;
 
     this.ctx.beginPath();
 
@@ -232,8 +238,13 @@ class PageContainer extends PureComponent {
     this.drawLoader(LOADER_OFFSET, Math.PI - LOADER_OFFSET);
     this.drawLoader(Math.PI + LOADER_OFFSET, Math.PI * 2 - LOADER_OFFSET);
 
+    // this.ctx.font = '22px Roboto';
+    // this.ctx.fillStyle = 'red';
+    // this.ctx.textAlign = 'center';
+    // this.ctx.fillText('Loading...', halfWidth, halfHeight);
+
     if (loaderRadius >= LOADER_RADIUS) {
-      this.bounce();
+      this.gradualIncreaseEffect();
     }
 
     this.setState(prevState => ({
@@ -251,27 +262,30 @@ class PageContainer extends PureComponent {
     }));
   };
 
-  bounce = () => {
-    const { bounceCurrentFrame } = this.state;
+  gradualIncreaseEffect = () => {
+    const { increaseRadius, increaseSpeed } = this.state;
 
-    const animationDuration = parseInt(BOUNCE_DURATION / FPS, 10);
-    const frame = bounceCurrentFrame / animationDuration;
-
-    // if you go to the last frame
-    if (animationDuration === (bounceCurrentFrame - 1)) {
+    if (parseInt(increaseRadius, 10) >= MAX_LOADER_RADIUS) {
       return;
     }
 
-    // 0.3 ~ 30%
-    // need to pick up coefficients
-    const value = frame < 0.3
-      ? -15
-      : (frame < 0.5 ? 10 : 0);
+    const percentageValue = ((MAX_LOADER_RADIUS - LOADER_RADIUS) * PERCENT_OF_DESCREASE / 100) + LOADER_RADIUS;
 
+    let finalIncreaseSpeed = increaseSpeed;
+
+    if (increaseRadius >= percentageValue) {
+      const speed = increaseSpeed - DESCREASE_SPEED_OF_INCREASE_SPEED;
+
+      if (speed <= 0.1) {
+        finalIncreaseSpeed = 0.1;
+      } else {
+        finalIncreaseSpeed = speed;
+      }
+    }
 
     this.setState(prevState => ({
-      bounceRadius: prevState.bounceRadius + value,
-      bounceCurrentFrame: prevState.bounceCurrentFrame + 1,
+      increaseRadius: prevState.increaseRadius + increaseSpeed,
+      increaseSpeed: finalIncreaseSpeed,
     }));
   };
 
@@ -292,12 +306,26 @@ class PageContainer extends PureComponent {
   };
 
   render() {
-    const { width, height } = this.state;
+    const { width, height, loaderRadius, increaseRadius } = this.state;
     const { label } = this.props;
+
+    // let doubleRadius;
+    //
+    // if (loaderRadius < increaseRadius) {
+    //   doubleRadius = loaderRadius * 2;
+    // }
+
+    // const doubleRadius = (loaderRadius >= increaseRadius ? increaseRadius : loaderRadius) * 2;
 
     return (
       <div className="preloader">
-        <p className="preloader__label">{label || 'Loading...'}</p>
+        {/*<div className="preloader__label">*/}
+          {/*{loaderRadius > 0 && (*/}
+            {/*<p style={{ width: doubleRadius, height: doubleRadius }}>*/}
+              {/*{label || 'Loading...'}*/}
+            {/*</p>*/}
+          {/*)}*/}
+        {/*</div>*/}
         <canvas ref={this.canvas} width={width} height={height} />
       </div>
     );

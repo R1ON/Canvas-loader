@@ -1,3 +1,6 @@
+body
+  background: red
+
 .preloader
   position: absolute
   top: 0
@@ -14,12 +17,20 @@
     height: 100%
     width: 100%
 
-    margin: 0
-
     z-index: 11111111111
 
     color: #fff
     font-size: 32px
+    > p
+      background: red
+      margin: 0
+      height: 0
+      width: 0
+      display: flex
+      align-items: center
+      justify-content: center
+      overflow: hidden
+      border-radius: 100%
 
   canvas
     position: absolute
