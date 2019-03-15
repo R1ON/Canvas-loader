@@ -4,30 +4,11 @@ import PropTypes from 'prop-types';
 import { throttle } from 'common/utils/lodash';
 
 import {
-  PART_COLOR,
-  PART_COLOR_LIGHTER,
-  PART_LINE_WIDTH,
-  BACKGROUND_COLOR,
-  MIN_RADIUS_VALUE,
-  RADIUS_RANGE,
-  RADIUS_SPEED,
-  LOADER_RADIUS,
-  MAX_LOADER_RADIUS,
-  LOADER_SPEED,
-  LOADER_OFFSET,
-  LOADER_ACCELERATION,
-  DEFAULT_ROTATE_LOADER_VALUE,
-  PERCENT_OF_DESCREASE,
-  INCREASE_SPEED,
-  DESCREASE_SPEED_OF_INCREASE_SPEED,
-  RADIUS_ACCELERATION,
-  SECOND_ANIMATION_RADIUS_SPEED,
-  SECOND_ANIMATION_RADIUS_ACCELERATION,
-  DEFAULT_ROTATE_VALUE,
-  OFFSET_SPEED,
-  DEFAULT_OFFSET_VALUE,
   REDRAW_CANVAS_TIME,
   ANIMATION_PART,
+  COLORS,
+  FIRST_ANIMATION,
+  SECOND_ANIMATION,
 } from '../constants/settings';
 
 class PageContainer extends PureComponent {
@@ -42,25 +23,36 @@ class PageContainer extends PureComponent {
 
     this.deviceDiagonal = this.calculateDiagonal(width, height);
 
+    const { offsetBetweenParts } = FIRST_ANIMATION;
+
+    const {
+      minLoaderRadius,
+      increaseSpeed,
+    } = SECOND_ANIMATION;
+
     this.state = {
-      width,
-      height,
-      animationPart: ANIMATION_PART.first,
+      width, // canvas width
+      height, // canvas height
+
       animationId: 0,
-      rotateValue: 0,
-      radiusAcceleration: 0,
+      animationPart: ANIMATION_PART.first, // current working animation
+      cancelAnimationFrame: false,
+
+      offset: offsetBetweenParts,
+      radius: this.deviceDiagonal,
+      rotateBackgroundValue: 0,
+
+      backgroundRadiusAcceleration: 0,
+
       loaderRadius: 0,
       loaderRotateValue: 0,
-      increaseRadius: LOADER_RADIUS,
-      increaseSpeed: INCREASE_SPEED,
-      offset: DEFAULT_OFFSET_VALUE,
-      radius: this.deviceDiagonal,
-      cancelAnimationFrame: false,
+      increaseRadius: minLoaderRadius,
+      increaseSpeed,
     };
 
     const drawCanvasWithThrottle = throttle(this.redrawCanvas, REDRAW_CANVAS_TIME);
 
-    window.onresize = () => this.redrawCanvas();
+    window.onresize = () => drawCanvasWithThrottle();
   }
 
   componentDidMount() {
@@ -80,7 +72,7 @@ class PageContainer extends PureComponent {
   }
 
   calculateDiagonal = (width, height) => (
-    Math.sqrt((width ** 2) + (height ** 2)) / RADIUS_RANGE
+    Math.sqrt((width ** 2) + (height ** 2)) / FIRST_ANIMATION.rangeRadius
   );
 
   redrawCanvas = () => {
@@ -104,60 +96,45 @@ class PageContainer extends PureComponent {
     this.ctx.clearRect(0, 0, width, height);
   };
 
-  clearRotatingCanvas = () => {
-    const { width, height } = this.state;
-
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
-
-    this.clearCanvas();
-
-    this.ctx.beginPath();
-    this.ctx.fillStyle = BACKGROUND_COLOR;
-    this.ctx.arc(halfWidth, halfHeight, this.deviceDiagonal, 0, Math.PI * 2);
-    this.ctx.fill();
-  };
-
   rotateCanvas = () => {
     const {
-      width, height, rotateValue, cancelAnimationFrame,
+      width, height, rotateBackgroundValue, cancelAnimationFrame,
     } = this.state;
+
+    const { defaultRotateValue } = FIRST_ANIMATION;
 
     const halfWidth = width / 2;
     const halfHeight = height / 2;
 
-    // because it draws a circle that rotates,
-    // you need to clean a canvas in a circle
-    // this.clearRotatingCanvas();
-
-    // TODO: нужно чистить через квадрат, чтобы он не перекрывал background белым цветом
-    const main = width > height ? width : height;
-    this.ctx.clearRect(-main * 2, -height * 2, main * 4, main * 4);
+    this.ctx.clearRect(-this.deviceDiagonal, -this.deviceDiagonal, this.deviceDiagonal * 3, this.deviceDiagonal * 3);
 
     this.ctx.translate(halfWidth, halfHeight);
 
     if (cancelAnimationFrame) {
-      this.ctx.rotate(rotateValue);
+      this.ctx.rotate(rotateBackgroundValue);
     } else {
-      this.ctx.rotate(DEFAULT_ROTATE_VALUE);
+      this.ctx.rotate(defaultRotateValue);
     }
 
     this.ctx.translate(-halfWidth, -halfHeight);
 
     this.setState((prevState) => {
-      const newRadiusValue = prevState.radius - RADIUS_SPEED - prevState.radiusAcceleration;
+      const { radiusSpeed, radiusAcceleration, offsetSpeed } = FIRST_ANIMATION;
+      const newRadiusValue = prevState.radius - radiusSpeed - prevState.backgroundRadiusAcceleration;
 
       return ({
         radius: newRadiusValue,
         cancelAnimationFrame: false,
-        offset: prevState.offset - OFFSET_SPEED,
-        rotateValue: prevState.rotateValue + DEFAULT_ROTATE_VALUE,
-        radiusAcceleration: prevState.radiusAcceleration + RADIUS_ACCELERATION,
+        offset: prevState.offset - offsetSpeed,
+        rotateBackgroundValue: prevState.rotateBackgroundValue + defaultRotateValue,
+        backgroundRadiusAcceleration: prevState.backgroundRadiusAcceleration + radiusAcceleration,
       });
     });
   };
 
   drawOnePart = (startAngle, endAngle) => {
+    const { partLineWidth } = FIRST_ANIMATION;
+    const { main } = COLORS;
     const { width, height, radius } = this.state;
 
     const halfWidth = width / 2;
@@ -165,20 +142,21 @@ class PageContainer extends PureComponent {
 
     this.ctx.beginPath();
     this.ctx.arc(halfWidth, halfHeight, radius, startAngle, endAngle);
-    this.ctx.lineWidth = PART_LINE_WIDTH;
+    this.ctx.lineWidth = partLineWidth;
     this.ctx.lineCap = 'round';
-    this.ctx.strokeStyle = PART_COLOR;
+    this.ctx.strokeStyle = main;
     this.ctx.stroke();
   };
 
   firstAnimationPart = () => {
-    const { radius, offset, radiusAcceleration } = this.state;
+    const { radiusSpeed, minRadiusValue } = FIRST_ANIMATION;
+    const { radius, offset, backgroundRadiusAcceleration } = this.state;
 
-    if ((radius - RADIUS_SPEED - radiusAcceleration) < MIN_RADIUS_VALUE) {
-      this.clearRotatingCanvas();
+    if ((radius - radiusSpeed - backgroundRadiusAcceleration) < minRadiusValue) {
+      this.clearCanvas();
       this.setState({
         animationPart: ANIMATION_PART.second,
-        radius: MIN_RADIUS_VALUE,
+        radius: minRadiusValue,
       });
     } else {
       this.rotateCanvas();
@@ -195,11 +173,14 @@ class PageContainer extends PureComponent {
       width, height, loaderRadius, increaseRadius,
     } = this.state;
 
-    const radius = loaderRadius >= LOADER_RADIUS ? increaseRadius : loaderRadius;
+    const { loader } = COLORS;
+    const { minLoaderRadius } = SECOND_ANIMATION;
+
+    const radius = loaderRadius >= minLoaderRadius ? increaseRadius : loaderRadius;
 
     this.ctx.beginPath();
 
-    this.ctx.strokeStyle = BACKGROUND_COLOR;
+    this.ctx.strokeStyle = loader;
     this.ctx.lineWidth = 4;
     this.ctx.lineCap = 'round';
     this.ctx.arc(width / 2, height / 2, radius, startAngle, endAngle);
@@ -208,8 +189,19 @@ class PageContainer extends PureComponent {
 
   secondAnimationPart = () => {
     const {
-      width, height, radius, cancelAnimationFrame, rotateValue, loaderRotateValue, loaderRadius,
+      width, height, radius, cancelAnimationFrame, rotateBackgroundValue, loaderRotateValue, loaderRadius,
     } = this.state;
+
+    const { main, lighterMain } = COLORS;
+    const {
+      minLoaderRadius,
+      loaderSpeed,
+      loaderOffsetBetweenParts,
+      loaderAcceleration,
+      defaultRotateLoaderValue,
+      backgroundRadiusSpeed,
+      backgroundRadiusAcceleration,
+    } = SECOND_ANIMATION;
 
     const halfWidth = width / 2;
     const halfHeight = height / 2;
@@ -219,31 +211,38 @@ class PageContainer extends PureComponent {
     this.ctx.translate(halfWidth, halfHeight);
 
     if (cancelAnimationFrame) {
-      // rotateValue need because canvas already rotated (on rotateValue degree)
-      this.ctx.rotate(rotateValue + loaderRotateValue);
+      // rotateBackgroundValue need because canvas already rotated (on rotateBackgroundValue degree)
+      this.ctx.rotate(rotateBackgroundValue + loaderRotateValue);
     } else {
-      this.ctx.rotate(DEFAULT_ROTATE_LOADER_VALUE);
+      this.ctx.rotate(defaultRotateLoaderValue);
     }
 
     this.ctx.translate(-halfWidth, -halfHeight);
 
     const gradient = this.ctx.createRadialGradient(halfWidth, halfHeight, 0, halfWidth, halfHeight, radius);
-    gradient.addColorStop(0, PART_COLOR);
-    gradient.addColorStop(1, PART_COLOR_LIGHTER);
+    gradient.addColorStop(0, main);
+    gradient.addColorStop(1, lighterMain);
 
     this.ctx.fillStyle = gradient;
     this.ctx.arc(halfWidth, halfHeight, radius, 0, Math.PI * 2);
     this.ctx.fill();
 
-    this.drawLoader(LOADER_OFFSET, Math.PI - LOADER_OFFSET);
-    this.drawLoader(Math.PI + LOADER_OFFSET, Math.PI * 2 - LOADER_OFFSET);
+    this.drawLoader(loaderOffsetBetweenParts, Math.PI - loaderOffsetBetweenParts);
+    this.drawLoader(Math.PI + loaderOffsetBetweenParts, Math.PI * 2 - loaderOffsetBetweenParts);
 
-    // this.ctx.font = '22px Roboto';
-    // this.ctx.fillStyle = 'red';
-    // this.ctx.textAlign = 'center';
-    // this.ctx.fillText('Loading...', halfWidth, halfHeight);
+    //
+    // this.ctx.translate(halfWidth, halfHeight);
+    //
+    // this.ctx.rotate(-(rotateBackgroundValue + loaderRotateValue + defaultRotateLoaderValue));
+    //
+    // this.ctx.translate(-halfWidth, -halfHeight);
 
-    if (loaderRadius >= LOADER_RADIUS) {
+    this.ctx.font = '22px Roboto';
+    this.ctx.fillStyle = 'red';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText('Loading...', halfWidth, halfHeight);
+
+    if (loaderRadius >= minLoaderRadius) {
       this.gradualIncreaseEffect();
     }
 
@@ -251,11 +250,11 @@ class PageContainer extends PureComponent {
       cancelAnimationFrame: false,
       radius: radius > this.deviceDiagonal
         ? prevState.radius
-        : (prevState.radius + SECOND_ANIMATION_RADIUS_SPEED) * SECOND_ANIMATION_RADIUS_ACCELERATION,
-      loaderRadius: prevState.loaderRadius >= LOADER_RADIUS
-        ? LOADER_RADIUS
-        : (prevState.loaderRadius + LOADER_SPEED) * LOADER_ACCELERATION,
-      loaderRotateValue: prevState.loaderRotateValue + DEFAULT_ROTATE_LOADER_VALUE,
+        : (prevState.radius + backgroundRadiusSpeed) * backgroundRadiusAcceleration,
+      loaderRadius: prevState.loaderRadius >= minLoaderRadius
+        ? minLoaderRadius
+        : (prevState.loaderRadius + loaderSpeed) * loaderAcceleration,
+      loaderRotateValue: prevState.loaderRotateValue + defaultRotateLoaderValue,
       // animationPart: radius > this.deviceDiagonal
       //   ? ANIMATION_PART.third
       //   : ANIMATION_PART.second,
@@ -265,16 +264,23 @@ class PageContainer extends PureComponent {
   gradualIncreaseEffect = () => {
     const { increaseRadius, increaseSpeed } = this.state;
 
-    if (parseInt(increaseRadius, 10) >= MAX_LOADER_RADIUS) {
+    const {
+      minLoaderRadius,
+      maxLoaderRadius,
+      percentOfDecrease,
+      decreaseSpeedOfIncreaseSpeed,
+    } = SECOND_ANIMATION;
+
+    if (parseInt(increaseRadius, 10) >= maxLoaderRadius) {
       return;
     }
 
-    const percentageValue = ((MAX_LOADER_RADIUS - LOADER_RADIUS) * PERCENT_OF_DESCREASE / 100) + LOADER_RADIUS;
+    const percentageValue = ((maxLoaderRadius - minLoaderRadius) * percentOfDecrease / 100) + minLoaderRadius;
 
     let finalIncreaseSpeed = increaseSpeed;
 
     if (increaseRadius >= percentageValue) {
-      const speed = increaseSpeed - DESCREASE_SPEED_OF_INCREASE_SPEED;
+      const speed = increaseSpeed - decreaseSpeedOfIncreaseSpeed;
 
       if (speed <= 0.1) {
         finalIncreaseSpeed = 0.1;
