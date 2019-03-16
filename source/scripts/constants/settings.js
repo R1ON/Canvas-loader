@@ -1,4 +1,5 @@
 export const REDRAW_CANVAS_TIME = 300;
+export const TEXT_INSIDE_LOADER = 'LOADING';
 
 export const ANIMATION_PART = {
   first: 1,
@@ -31,10 +32,14 @@ export const SECOND_ANIMATION = {
   increaseSpeed: 0.3,
   decreaseSpeedOfIncreaseSpeed: 0.005,
   percentOfDecrease: 20,
+
+  minTextAlpha: 0.3,
+  maxTextAlpha: 1,
+  textAlphaSpeed: 0.009,
 };
 
 export const COLORS = {
-  main: '#000048',
+  main: '#00003f',
   lighterMain: '#103091',
-  loader: '#ffffff',
+  white: '#ffffff',
 };

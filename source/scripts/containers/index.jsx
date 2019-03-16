@@ -4,11 +4,12 @@ import PropTypes from 'prop-types';
 import { throttle } from 'common/utils/lodash';
 
 import {
-  REDRAW_CANVAS_TIME,
-  ANIMATION_PART,
   COLORS,
+  ANIMATION_PART,
   FIRST_ANIMATION,
   SECOND_ANIMATION,
+  TEXT_INSIDE_LOADER,
+  REDRAW_CANVAS_TIME,
 } from '../constants/settings';
 
 class PageContainer extends PureComponent {
@@ -28,6 +29,7 @@ class PageContainer extends PureComponent {
     const {
       minLoaderRadius,
       increaseSpeed,
+      minTextAlpha,
     } = SECOND_ANIMATION;
 
     this.state = {
@@ -48,6 +50,9 @@ class PageContainer extends PureComponent {
       loaderRotateValue: 0,
       increaseRadius: minLoaderRadius,
       increaseSpeed,
+
+      textAlpha: minTextAlpha,
+      needToAdd: true,
     };
 
     const drawCanvasWithThrottle = throttle(this.redrawCanvas, REDRAW_CANVAS_TIME);
@@ -170,17 +175,17 @@ class PageContainer extends PureComponent {
 
   drawLoader = (startAngle, endAngle) => {
     const {
-      width, height, loaderRadius, increaseRadius,
+      width, height, loaderRadius, increaseRadius, textAlpha,
     } = this.state;
 
-    const { loader } = COLORS;
+    const { white } = COLORS;
     const { minLoaderRadius } = SECOND_ANIMATION;
 
     const radius = loaderRadius >= minLoaderRadius ? increaseRadius : loaderRadius;
 
     this.ctx.beginPath();
 
-    this.ctx.strokeStyle = loader;
+    this.ctx.strokeStyle = white;
     this.ctx.lineWidth = 4;
     this.ctx.lineCap = 'round';
     this.ctx.arc(width / 2, height / 2, radius, startAngle, endAngle);
@@ -189,10 +194,19 @@ class PageContainer extends PureComponent {
 
   secondAnimationPart = () => {
     const {
-      width, height, radius, cancelAnimationFrame, rotateBackgroundValue, loaderRotateValue, loaderRadius,
+      width,
+      height,
+      radius,
+      loaderRotateValue,
+      loaderRadius,
+      increaseRadius,
+      textAlpha,
+      needToAdd,
     } = this.state;
 
-    const { main, lighterMain } = COLORS;
+    const { label } = this.props;
+
+    const { main, lighterMain, white } = COLORS;
     const {
       minLoaderRadius,
       loaderSpeed,
@@ -201,6 +215,9 @@ class PageContainer extends PureComponent {
       defaultRotateLoaderValue,
       backgroundRadiusSpeed,
       backgroundRadiusAcceleration,
+      maxTextAlpha,
+      minTextAlpha,
+      textAlphaSpeed,
     } = SECOND_ANIMATION;
 
     const halfWidth = width / 2;
@@ -209,13 +226,7 @@ class PageContainer extends PureComponent {
     this.ctx.beginPath();
 
     this.ctx.translate(halfWidth, halfHeight);
-
-    if (cancelAnimationFrame) {
-      // rotateBackgroundValue need because canvas already rotated (on rotateBackgroundValue degree)
-      this.ctx.rotate(rotateBackgroundValue + loaderRotateValue);
-    } else {
-      this.ctx.rotate(defaultRotateLoaderValue);
-    }
+    this.ctx.rotate(loaderRotateValue);
 
     this.ctx.translate(-halfWidth, -halfHeight);
 
@@ -230,35 +241,58 @@ class PageContainer extends PureComponent {
     this.drawLoader(loaderOffsetBetweenParts, Math.PI - loaderOffsetBetweenParts);
     this.drawLoader(Math.PI + loaderOffsetBetweenParts, Math.PI * 2 - loaderOffsetBetweenParts);
 
-    //
-    // this.ctx.translate(halfWidth, halfHeight);
-    //
-    // this.ctx.rotate(-(rotateBackgroundValue + loaderRotateValue + defaultRotateLoaderValue));
-    //
-    // this.ctx.translate(-halfWidth, -halfHeight);
+    this.ctx.resetTransform();
+    this.ctx.save();
 
-    this.ctx.font = '22px Roboto';
-    this.ctx.fillStyle = 'red';
+    const clipRadius = loaderRadius >= minLoaderRadius ? increaseRadius : loaderRadius;
+    this.ctx.arc(halfWidth, halfHeight, clipRadius, 0, Math.PI * 2);
+    this.ctx.clip();
+
+    // todo scale from 1.5 to 1
+    this.ctx.globalAlpha = textAlpha;
+    this.ctx.font = '22px RalewayL, sans-serif';
+    this.ctx.fillStyle = white;
     this.ctx.textAlign = 'center';
-    this.ctx.fillText('Loading...', halfWidth, halfHeight);
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText(label || TEXT_INSIDE_LOADER, halfWidth, halfHeight);
+
+    this.ctx.restore();
 
     if (loaderRadius >= minLoaderRadius) {
       this.gradualIncreaseEffect();
     }
 
-    this.setState(prevState => ({
-      cancelAnimationFrame: false,
-      radius: radius > this.deviceDiagonal
-        ? prevState.radius
-        : (prevState.radius + backgroundRadiusSpeed) * backgroundRadiusAcceleration,
-      loaderRadius: prevState.loaderRadius >= minLoaderRadius
-        ? minLoaderRadius
-        : (prevState.loaderRadius + loaderSpeed) * loaderAcceleration,
-      loaderRotateValue: prevState.loaderRotateValue + defaultRotateLoaderValue,
-      // animationPart: radius > this.deviceDiagonal
-      //   ? ANIMATION_PART.third
-      //   : ANIMATION_PART.second,
-    }));
+    this.setState((prevState) => {
+      let newTextAlpha;
+      let needToAddNewValue = needToAdd;
+
+      if (textAlpha >= maxTextAlpha) needToAddNewValue = false;
+      if (textAlpha <= minTextAlpha) needToAddNewValue = true;
+
+      if (needToAddNewValue) {
+        // opacity can't be more then 1
+        newTextAlpha = prevState.textAlpha + textAlphaSpeed > 1 ? 1 : prevState.textAlpha + textAlphaSpeed;
+      } else {
+        // opacity can't be less then 0
+        newTextAlpha = prevState.textAlpha - textAlphaSpeed < 0 ? 0 : prevState.textAlpha - textAlphaSpeed;
+      }
+
+      return ({
+        cancelAnimationFrame: false,
+        needToAdd: needToAddNewValue,
+        textAlpha: newTextAlpha,
+        radius: radius > this.deviceDiagonal
+          ? prevState.radius
+          : (prevState.radius + backgroundRadiusSpeed) * backgroundRadiusAcceleration,
+        loaderRadius: prevState.loaderRadius >= minLoaderRadius
+          ? minLoaderRadius
+          : (prevState.loaderRadius + loaderSpeed) * loaderAcceleration,
+        loaderRotateValue: prevState.loaderRotateValue + defaultRotateLoaderValue,
+        // animationPart: radius > this.deviceDiagonal
+        //   ? ANIMATION_PART.third
+        //   : ANIMATION_PART.second,
+      });
+    });
   };
 
   gradualIncreaseEffect = () => {
@@ -312,26 +346,10 @@ class PageContainer extends PureComponent {
   };
 
   render() {
-    const { width, height, loaderRadius, increaseRadius } = this.state;
-    const { label } = this.props;
-
-    // let doubleRadius;
-    //
-    // if (loaderRadius < increaseRadius) {
-    //   doubleRadius = loaderRadius * 2;
-    // }
-
-    // const doubleRadius = (loaderRadius >= increaseRadius ? increaseRadius : loaderRadius) * 2;
+    const { width, height } = this.state;
 
     return (
       <div className="preloader">
-        {/*<div className="preloader__label">*/}
-          {/*{loaderRadius > 0 && (*/}
-            {/*<p style={{ width: doubleRadius, height: doubleRadius }}>*/}
-              {/*{label || 'Loading...'}*/}
-            {/*</p>*/}
-          {/*)}*/}
-        {/*</div>*/}
         <canvas ref={this.canvas} width={width} height={height} />
       </div>
     );
