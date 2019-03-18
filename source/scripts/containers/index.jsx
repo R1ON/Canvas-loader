@@ -10,6 +10,7 @@ import {
   SECOND_ANIMATION,
   TEXT_INSIDE_LOADER,
   REDRAW_CANVAS_TIME,
+  FIGURES_SETTINGS,
 } from '../constants/settings';
 
 class PageContainer extends PureComponent {
@@ -339,10 +340,44 @@ class PageContainer extends PureComponent {
       default: break;
     }
 
+
+    this.drawRectangle(50, 50);
+
     if (animationPart !== ANIMATION_PART.third) {
       const animationId = requestAnimationFrame(this.drawAnimationParts);
       this.setState({ animationId });
     }
+  };
+
+  drawRectangle = (x, y) => {
+    const { size, lineWidth, color } = FIGURES_SETTINGS;
+
+    const halfSize = size / 2;
+
+    // круг
+    // this.ctx.beginPath();
+    // this.ctx.lineWidth = lineWidth;
+    // this.ctx.strokeStyle = color;
+    // this.ctx.arc(x, y, halfSize, 0, Math.PI * 2);
+    // this.ctx.stroke();
+
+    // квадрат
+    // this.ctx.beginPath();
+    // this.ctx.lineWidth = lineWidth;
+    // this.ctx.strokeStyle = color;
+    // this.ctx.rect(x, y, size, size);
+    // this.ctx.stroke();
+
+    // треугольник
+    this.ctx.beginPath();
+    this.ctx.moveTo(x, y);
+    this.ctx.lineTo(x - halfSize, y + 10 + halfSize);
+    this.ctx.lineTo(x + halfSize, y + 10 + halfSize);
+    this.ctx.closePath();
+
+    this.ctx.lineWidth = lineWidth;
+    this.ctx.strokeStyle = color;
+    this.ctx.stroke();
   };
 
   render() {

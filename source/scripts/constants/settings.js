@@ -43,3 +43,9 @@ export const COLORS = {
   lighterMain: '#103091',
   white: '#ffffff',
 };
+
+export const FIGURES_SETTINGS = {
+  size: 40,
+  color: '#ffffff',
+  lineWidth: 2,
+};
