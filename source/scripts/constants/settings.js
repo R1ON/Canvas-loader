@@ -23,6 +23,7 @@ export const SECOND_ANIMATION = {
   loaderAcceleration: 1.1,
   loaderOffsetBetweenParts: 0.6,
   defaultRotateLoaderValue: Math.PI / 50,
+  slowdownRotate: 0.001,
   minLoaderRadius: 150,
   maxLoaderRadius: 200,
 
@@ -35,17 +36,11 @@ export const SECOND_ANIMATION = {
 
   minTextAlpha: 0.3,
   maxTextAlpha: 1,
-  textAlphaSpeed: 0.009,
+  textAlphaSpeed: 0.008,
 };
 
 export const COLORS = {
-  main: '#00003f',
-  lighterMain: '#103091',
+  main: '#700000',
+  lighterMain: '#FF6633',
   white: '#ffffff',
-};
-
-export const FIGURES_SETTINGS = {
-  size: 40,
-  color: '#ffffff',
-  lineWidth: 2,
 };

@@ -10,7 +10,6 @@ import {
   SECOND_ANIMATION,
   TEXT_INSIDE_LOADER,
   REDRAW_CANVAS_TIME,
-  FIGURES_SETTINGS,
 } from '../constants/settings';
 
 class PageContainer extends PureComponent {
@@ -31,6 +30,7 @@ class PageContainer extends PureComponent {
       minLoaderRadius,
       increaseSpeed,
       minTextAlpha,
+      defaultRotateLoaderValue,
     } = SECOND_ANIMATION;
 
     this.state = {
@@ -49,6 +49,8 @@ class PageContainer extends PureComponent {
 
       loaderRadius: 0,
       loaderRotateValue: 0,
+      currentRotateValue: defaultRotateLoaderValue,
+      endLoaderAnimation: false,
       increaseRadius: minLoaderRadius,
       increaseSpeed,
 
@@ -164,6 +166,10 @@ class PageContainer extends PureComponent {
         animationPart: ANIMATION_PART.second,
         radius: minRadiusValue,
       });
+
+      setTimeout(() => this.setState({
+        endLoaderAnimation: true,
+      }), 5000);
     } else {
       this.rotateCanvas();
 
@@ -176,7 +182,7 @@ class PageContainer extends PureComponent {
 
   drawLoader = (startAngle, endAngle) => {
     const {
-      width, height, loaderRadius, increaseRadius, textAlpha,
+      width, height, loaderRadius, increaseRadius,
     } = this.state;
 
     const { white } = COLORS;
@@ -203,6 +209,8 @@ class PageContainer extends PureComponent {
       increaseRadius,
       textAlpha,
       needToAdd,
+      endLoaderAnimation,
+      currentRotateValue,
     } = this.state;
 
     const { label } = this.props;
@@ -213,7 +221,7 @@ class PageContainer extends PureComponent {
       loaderSpeed,
       loaderOffsetBetweenParts,
       loaderAcceleration,
-      defaultRotateLoaderValue,
+      slowdownRotate,
       backgroundRadiusSpeed,
       backgroundRadiusAcceleration,
       maxTextAlpha,
@@ -231,6 +239,8 @@ class PageContainer extends PureComponent {
 
     this.ctx.translate(-halfWidth, -halfHeight);
 
+    // TODO градиент при зуме не работает нормально
+    // при апдейте нужно пересчитывать радиус
     const gradient = this.ctx.createRadialGradient(halfWidth, halfHeight, 0, halfWidth, halfHeight, radius);
     gradient.addColorStop(0, main);
     gradient.addColorStop(1, lighterMain);
@@ -263,9 +273,10 @@ class PageContainer extends PureComponent {
       this.gradualIncreaseEffect();
     }
 
-    this.setState((prevState) => {
+    return this.setState((prevState) => {
       let newTextAlpha;
       let needToAddNewValue = needToAdd;
+      let nextRotateValue = currentRotateValue;
 
       if (textAlpha >= maxTextAlpha) needToAddNewValue = false;
       if (textAlpha <= minTextAlpha) needToAddNewValue = true;
@@ -278,6 +289,22 @@ class PageContainer extends PureComponent {
         newTextAlpha = prevState.textAlpha - textAlphaSpeed < 0 ? 0 : prevState.textAlpha - textAlphaSpeed;
       }
 
+      // TODO: Как только он доходит до 0, немного повернуть в обратную сторону
+      // + увеличить радиус спиннера
+      // а дальше вращать его как обычно, но очень быстро увеличивая скорость
+      // и уменьшая радиус
+
+      if (endLoaderAnimation) {
+        const reducedAngle = currentRotateValue - slowdownRotate;
+
+        if (reducedAngle > -0.05) {
+          nextRotateValue = reducedAngle;
+        }
+      }
+      
+      console.log('currentRotateValue', currentRotateValue)
+      
+
       return ({
         cancelAnimationFrame: false,
         needToAdd: needToAddNewValue,
@@ -288,7 +315,9 @@ class PageContainer extends PureComponent {
         loaderRadius: prevState.loaderRadius >= minLoaderRadius
           ? minLoaderRadius
           : (prevState.loaderRadius + loaderSpeed) * loaderAcceleration,
-        loaderRotateValue: prevState.loaderRotateValue + defaultRotateLoaderValue,
+        loaderRotateValue: prevState.loaderRotateValue + currentRotateValue,
+        currentRotateValue: nextRotateValue,
+        // increaseRadius: nextRotateValue < 0 ? prevState.increaseRadius + 1 : prevState.increaseRadius,
         // animationPart: radius > this.deviceDiagonal
         //   ? ANIMATION_PART.third
         //   : ANIMATION_PART.second,
@@ -340,44 +369,10 @@ class PageContainer extends PureComponent {
       default: break;
     }
 
-
-    this.drawRectangle(50, 50);
-
     if (animationPart !== ANIMATION_PART.third) {
       const animationId = requestAnimationFrame(this.drawAnimationParts);
       this.setState({ animationId });
     }
-  };
-
-  drawRectangle = (x, y) => {
-    const { size, lineWidth, color } = FIGURES_SETTINGS;
-
-    const halfSize = size / 2;
-
-    // круг
-    // this.ctx.beginPath();
-    // this.ctx.lineWidth = lineWidth;
-    // this.ctx.strokeStyle = color;
-    // this.ctx.arc(x, y, halfSize, 0, Math.PI * 2);
-    // this.ctx.stroke();
-
-    // квадрат
-    // this.ctx.beginPath();
-    // this.ctx.lineWidth = lineWidth;
-    // this.ctx.strokeStyle = color;
-    // this.ctx.rect(x, y, size, size);
-    // this.ctx.stroke();
-
-    // треугольник
-    this.ctx.beginPath();
-    this.ctx.moveTo(x, y);
-    this.ctx.lineTo(x - halfSize, y + 10 + halfSize);
-    this.ctx.lineTo(x + halfSize, y + 10 + halfSize);
-    this.ctx.closePath();
-
-    this.ctx.lineWidth = lineWidth;
-    this.ctx.strokeStyle = color;
-    this.ctx.stroke();
   };
 
   render() {
