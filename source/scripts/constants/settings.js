@@ -5,6 +5,7 @@ export const ANIMATION_PART = {
   first: 1,
   second: 2,
   third: 3,
+  fourth: 4,
 };
 
 export const FIRST_ANIMATION = {

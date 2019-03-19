@@ -169,7 +169,7 @@ class PageContainer extends PureComponent {
 
       setTimeout(() => this.setState({
         endLoaderAnimation: true,
-      }), 5000);
+      }), 3000);
     } else {
       this.rotateCanvas();
 
@@ -199,134 +199,8 @@ class PageContainer extends PureComponent {
     this.ctx.stroke();
   };
 
-  secondAnimationPart = () => {
-    const {
-      width,
-      height,
-      radius,
-      loaderRotateValue,
-      loaderRadius,
-      increaseRadius,
-      textAlpha,
-      needToAdd,
-      endLoaderAnimation,
-      currentRotateValue,
-    } = this.state;
-
-    const { label } = this.props;
-
-    const { main, lighterMain, white } = COLORS;
-    const {
-      minLoaderRadius,
-      loaderSpeed,
-      loaderOffsetBetweenParts,
-      loaderAcceleration,
-      slowdownRotate,
-      backgroundRadiusSpeed,
-      backgroundRadiusAcceleration,
-      maxTextAlpha,
-      minTextAlpha,
-      textAlphaSpeed,
-    } = SECOND_ANIMATION;
-
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
-
-    this.ctx.beginPath();
-
-    this.ctx.translate(halfWidth, halfHeight);
-    this.ctx.rotate(loaderRotateValue);
-
-    this.ctx.translate(-halfWidth, -halfHeight);
-
-    // TODO градиент при зуме не работает нормально
-    // при апдейте нужно пересчитывать радиус
-    const gradient = this.ctx.createRadialGradient(halfWidth, halfHeight, 0, halfWidth, halfHeight, radius);
-    gradient.addColorStop(0, main);
-    gradient.addColorStop(1, lighterMain);
-
-    this.ctx.fillStyle = gradient;
-    this.ctx.arc(halfWidth, halfHeight, radius, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    this.drawLoader(loaderOffsetBetweenParts, Math.PI - loaderOffsetBetweenParts);
-    this.drawLoader(Math.PI + loaderOffsetBetweenParts, Math.PI * 2 - loaderOffsetBetweenParts);
-
-    this.ctx.resetTransform();
-    this.ctx.save();
-
-    const clipRadius = loaderRadius >= minLoaderRadius ? increaseRadius : loaderRadius;
-    this.ctx.arc(halfWidth, halfHeight, clipRadius, 0, Math.PI * 2);
-    this.ctx.clip();
-
-    // todo scale from 1.5 to 1
-    this.ctx.globalAlpha = textAlpha;
-    this.ctx.font = '22px RalewayL, sans-serif';
-    this.ctx.fillStyle = white;
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(label || TEXT_INSIDE_LOADER, halfWidth, halfHeight);
-
-    this.ctx.restore();
-
-    if (loaderRadius >= minLoaderRadius) {
-      this.gradualIncreaseEffect();
-    }
-
-    return this.setState((prevState) => {
-      let newTextAlpha;
-      let needToAddNewValue = needToAdd;
-      let nextRotateValue = currentRotateValue;
-
-      if (textAlpha >= maxTextAlpha) needToAddNewValue = false;
-      if (textAlpha <= minTextAlpha) needToAddNewValue = true;
-
-      if (needToAddNewValue) {
-        // opacity can't be more then 1
-        newTextAlpha = prevState.textAlpha + textAlphaSpeed > 1 ? 1 : prevState.textAlpha + textAlphaSpeed;
-      } else {
-        // opacity can't be less then 0
-        newTextAlpha = prevState.textAlpha - textAlphaSpeed < 0 ? 0 : prevState.textAlpha - textAlphaSpeed;
-      }
-
-      // TODO: Как только он доходит до 0, немного повернуть в обратную сторону
-      // + увеличить радиус спиннера
-      // а дальше вращать его как обычно, но очень быстро увеличивая скорость
-      // и уменьшая радиус
-
-      if (endLoaderAnimation) {
-        const reducedAngle = currentRotateValue - slowdownRotate;
-
-        if (reducedAngle > -0.05) {
-          nextRotateValue = reducedAngle;
-        }
-      }
-      
-      console.log('currentRotateValue', currentRotateValue)
-      
-
-      return ({
-        cancelAnimationFrame: false,
-        needToAdd: needToAddNewValue,
-        textAlpha: newTextAlpha,
-        radius: radius > this.deviceDiagonal
-          ? prevState.radius
-          : (prevState.radius + backgroundRadiusSpeed) * backgroundRadiusAcceleration,
-        loaderRadius: prevState.loaderRadius >= minLoaderRadius
-          ? minLoaderRadius
-          : (prevState.loaderRadius + loaderSpeed) * loaderAcceleration,
-        loaderRotateValue: prevState.loaderRotateValue + currentRotateValue,
-        currentRotateValue: nextRotateValue,
-        // increaseRadius: nextRotateValue < 0 ? prevState.increaseRadius + 1 : prevState.increaseRadius,
-        // animationPart: radius > this.deviceDiagonal
-        //   ? ANIMATION_PART.third
-        //   : ANIMATION_PART.second,
-      });
-    });
-  };
-
   gradualIncreaseEffect = () => {
-    const { increaseRadius, increaseSpeed } = this.state;
+    const { increaseRadius, increaseSpeed, currentRotateValue } = this.state;
 
     const {
       minLoaderRadius,
@@ -335,7 +209,13 @@ class PageContainer extends PureComponent {
       decreaseSpeedOfIncreaseSpeed,
     } = SECOND_ANIMATION;
 
-    if (parseInt(increaseRadius, 10) >= maxLoaderRadius) {
+    // if (currentRotateValue === 0) {
+    //   return this.setState(prevState => ({
+    //     increaseRadius: increaseRadius > 250 ? increaseRadius : prevState.increaseRadius + 5,
+    //   }));
+    // }
+
+    if (parseInt(increaseRadius, 10) >= maxLoaderRadius || currentRotateValue === 0) {
       return;
     }
 
@@ -359,17 +239,205 @@ class PageContainer extends PureComponent {
     }));
   };
 
+  rotateLoader = () => {
+    const { width, height, loaderRotateValue } = this.state;
+
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+
+    this.ctx.beginPath();
+
+    this.ctx.translate(halfWidth, halfHeight);
+    this.ctx.rotate(loaderRotateValue);
+
+    this.ctx.translate(-halfWidth, -halfHeight);
+  };
+
+  drawGradient = () => {
+    const {
+      width,
+      height,
+      radius,
+    } = this.state;
+
+    const { main, lighterMain } = COLORS;
+
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+
+    // TODO градиент при зуме не работает нормально
+    // при апдейте нужно пересчитывать радиус
+    const gradient = this.ctx.createRadialGradient(halfWidth, halfHeight, 0, halfWidth, halfHeight, radius);
+    gradient.addColorStop(0, main);
+    gradient.addColorStop(1, lighterMain);
+
+    this.ctx.fillStyle = gradient;
+    this.ctx.arc(halfWidth, halfHeight, radius, 0, Math.PI * 2);
+    this.ctx.fill();
+  };
+
+  drawLoadingText = () => {
+    const {
+      width,
+      height,
+      textAlpha,
+      loaderRadius,
+      increaseRadius,
+    } = this.state;
+
+    const { label } = this.props;
+    const { white } = COLORS;
+    const { minLoaderRadius } = SECOND_ANIMATION;
+
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+
+    this.ctx.resetTransform();
+    this.ctx.save();
+
+    const clipRadius = loaderRadius >= minLoaderRadius ? increaseRadius : loaderRadius;
+    this.ctx.arc(halfWidth, halfHeight, clipRadius, 0, Math.PI * 2);
+    this.ctx.clip();
+
+    // todo scale from 1.5 to 1
+    this.ctx.globalAlpha = textAlpha;
+    this.ctx.font = '22px RalewayL, sans-serif';
+    this.ctx.fillStyle = white;
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText(label || TEXT_INSIDE_LOADER, halfWidth, halfHeight);
+
+    this.ctx.restore();
+  };
+
+  newTextAlphaValue = (prevTextAlpha) => {
+    const { textAlpha, needToAdd } = this.state;
+    const { maxTextAlpha, minTextAlpha, textAlphaSpeed } = SECOND_ANIMATION;
+
+    let newTextAlpha;
+    let needToAddNewValue = needToAdd;
+
+    if (textAlpha >= maxTextAlpha) needToAddNewValue = false;
+    if (textAlpha <= minTextAlpha) needToAddNewValue = true;
+
+    if (needToAddNewValue) { // opacity can't be more then 1
+      newTextAlpha = prevTextAlpha + textAlphaSpeed > 1 ? 1 : prevTextAlpha + textAlphaSpeed;
+    } else { // opacity can't be less then 0
+      newTextAlpha = prevTextAlpha - textAlphaSpeed < 0 ? 0 : prevTextAlpha - textAlphaSpeed;
+    }
+
+    return {
+      newTextAlpha,
+      needToAddNewValue,
+    };
+  };
+
+  secondAnimationPart = () => {
+    const {
+      radius,
+      loaderRadius,
+      endLoaderAnimation,
+      currentRotateValue,
+    } = this.state;
+
+    const {
+      minLoaderRadius,
+      loaderSpeed,
+      loaderOffsetBetweenParts,
+      loaderAcceleration,
+      slowdownRotate,
+      backgroundRadiusSpeed,
+      backgroundRadiusAcceleration,
+    } = SECOND_ANIMATION;
+
+    this.rotateLoader();
+
+    this.drawGradient();
+
+    this.drawLoader(loaderOffsetBetweenParts, Math.PI - loaderOffsetBetweenParts);
+    this.drawLoader(Math.PI + loaderOffsetBetweenParts, Math.PI * 2 - loaderOffsetBetweenParts);
+
+    this.drawLoadingText();
+
+    if (loaderRadius >= minLoaderRadius) {
+      this.gradualIncreaseEffect();
+    }
+
+    return this.setState((prevState) => {
+      const {
+        newTextAlpha,
+        needToAddNewValue,
+      } = this.newTextAlphaValue(prevState.textAlpha);
+
+      let nextRotateValue = currentRotateValue;
+
+      if (endLoaderAnimation) {
+        const reducedAngle = currentRotateValue - slowdownRotate;
+
+        if (reducedAngle > 0) {
+          nextRotateValue = reducedAngle;
+        } else {
+          nextRotateValue = 0;
+        }
+      }
+
+      return ({
+        cancelAnimationFrame: false,
+        needToAdd: needToAddNewValue,
+        textAlpha: newTextAlpha,
+        radius: radius > this.deviceDiagonal
+          ? prevState.radius
+          : (prevState.radius + backgroundRadiusSpeed) * backgroundRadiusAcceleration,
+        loaderRadius: prevState.loaderRadius >= minLoaderRadius
+          ? minLoaderRadius
+          : (prevState.loaderRadius + loaderSpeed) * loaderAcceleration,
+        loaderRotateValue: prevState.loaderRotateValue + currentRotateValue,
+        currentRotateValue: nextRotateValue,
+        animationPart: nextRotateValue === 0
+          ? ANIMATION_PART.third
+          : ANIMATION_PART.second,
+      });
+    });
+  };
+
+  thirdAnimationPart = () => {
+    const {
+      loaderOffsetBetweenParts,
+    } = SECOND_ANIMATION;
+    this.rotateLoader();
+
+    this.drawGradient();
+
+    this.drawLoader(loaderOffsetBetweenParts, Math.PI - loaderOffsetBetweenParts);
+    this.drawLoader(Math.PI + loaderOffsetBetweenParts, Math.PI * 2 - loaderOffsetBetweenParts);
+
+    this.drawLoadingText();
+
+    this.setState((prevState) => {
+      const {
+        newTextAlpha,
+        needToAddNewValue,
+      } = this.newTextAlphaValue(prevState.textAlpha);
+
+      return ({
+        needToAdd: needToAddNewValue,
+        textAlpha: newTextAlpha,
+      });
+    });
+  };
+
   drawAnimationParts = () => {
     const { animationPart } = this.state;
 
     switch (animationPart) {
       case ANIMATION_PART.first: this.firstAnimationPart(); break;
       case ANIMATION_PART.second: this.secondAnimationPart(); break;
+      case ANIMATION_PART.third: this.thirdAnimationPart(); break;
 
       default: break;
     }
 
-    if (animationPart !== ANIMATION_PART.third) {
+    if (animationPart !== ANIMATION_PART.fourth) {
       const animationId = requestAnimationFrame(this.drawAnimationParts);
       this.setState({ animationId });
     }
