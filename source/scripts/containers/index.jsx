@@ -8,6 +8,7 @@ import {
   ANIMATION_PART,
   FIRST_ANIMATION,
   SECOND_ANIMATION,
+  THIRD_ANIMATION,
   TEXT_INSIDE_LOADER,
   REDRAW_CANVAS_TIME,
 } from '../constants/settings';
@@ -56,6 +57,9 @@ class PageContainer extends PureComponent {
 
       textAlpha: minTextAlpha,
       needToAdd: true,
+
+      startTwisting: false,
+      startTwistingTime: 0,
     };
 
     const drawCanvasWithThrottle = throttle(this.redrawCanvas, REDRAW_CANVAS_TIME);
@@ -182,13 +186,19 @@ class PageContainer extends PureComponent {
 
   drawLoader = (startAngle, endAngle) => {
     const {
-      width, height, loaderRadius, increaseRadius,
+      width, height, loaderRadius, increaseRadius, startTwisting
     } = this.state;
 
     const { white } = COLORS;
     const { minLoaderRadius } = SECOND_ANIMATION;
 
-    const radius = loaderRadius >= minLoaderRadius ? increaseRadius : loaderRadius;
+    let radius;
+
+    if (loaderRadius >= minLoaderRadius) {
+      radius = (startTwisting && increaseRadius < 0) ? 0 : increaseRadius;
+    } else {
+      radius = loaderRadius;
+    }
 
     this.ctx.beginPath();
 
@@ -208,12 +218,6 @@ class PageContainer extends PureComponent {
       percentOfDecrease,
       decreaseSpeedOfIncreaseSpeed,
     } = SECOND_ANIMATION;
-
-    // if (currentRotateValue === 0) {
-    //   return this.setState(prevState => ({
-    //     increaseRadius: increaseRadius > 250 ? increaseRadius : prevState.increaseRadius + 5,
-    //   }));
-    // }
 
     if (parseInt(increaseRadius, 10) >= maxLoaderRadius || currentRotateValue === 0) {
       return;
@@ -283,6 +287,7 @@ class PageContainer extends PureComponent {
       textAlpha,
       loaderRadius,
       increaseRadius,
+      startTwisting,
     } = this.state;
 
     const { label } = this.props;
@@ -295,8 +300,15 @@ class PageContainer extends PureComponent {
     this.ctx.resetTransform();
     this.ctx.save();
 
-    const clipRadius = loaderRadius >= minLoaderRadius ? increaseRadius : loaderRadius;
-    this.ctx.arc(halfWidth, halfHeight, clipRadius, 0, Math.PI * 2);
+    let radius;
+
+    if (loaderRadius >= minLoaderRadius) {
+      radius = (startTwisting && increaseRadius < 0) ? 0 : increaseRadius;
+    } else {
+      radius = loaderRadius;
+    }
+
+    this.ctx.arc(halfWidth, halfHeight, radius, 0, Math.PI * 2);
     this.ctx.clip();
 
     // todo scale from 1.5 to 1
@@ -383,8 +395,9 @@ class PageContainer extends PureComponent {
 
       return ({
         cancelAnimationFrame: false,
-        needToAdd: needToAddNewValue,
         textAlpha: newTextAlpha,
+        needToAdd: needToAddNewValue,
+        currentRotateValue: nextRotateValue,
         radius: radius > this.deviceDiagonal
           ? prevState.radius
           : (prevState.radius + backgroundRadiusSpeed) * backgroundRadiusAcceleration,
@@ -392,18 +405,23 @@ class PageContainer extends PureComponent {
           ? minLoaderRadius
           : (prevState.loaderRadius + loaderSpeed) * loaderAcceleration,
         loaderRotateValue: prevState.loaderRotateValue + currentRotateValue,
-        currentRotateValue: nextRotateValue,
         animationPart: nextRotateValue === 0
           ? ANIMATION_PART.third
-          : ANIMATION_PART.second,
+          : prevState.animationPart,
       });
     });
   };
 
   thirdAnimationPart = () => {
     const {
-      loaderOffsetBetweenParts,
-    } = SECOND_ANIMATION;
+      increaseRadius,
+      loaderRotateValue,
+      startTwisting,
+      startTwistingTime,
+    } = this.state;
+    const { loaderOffsetBetweenParts } = SECOND_ANIMATION;
+    const { maxTwistedValue } = THIRD_ANIMATION;
+
     this.rotateLoader();
 
     this.drawGradient();
@@ -419,9 +437,30 @@ class PageContainer extends PureComponent {
         needToAddNewValue,
       } = this.newTextAlphaValue(prevState.textAlpha);
 
+      let nextLoaderRotateValue;
+      let nextIncreaseRadius;
+
+      if (startTwisting) {
+        if (startTwistingTime > 20) {
+          nextLoaderRotateValue = loaderRotateValue + 0.2;
+          nextIncreaseRadius = increaseRadius - 10;
+        } else {
+          nextLoaderRotateValue = loaderRotateValue - 0.005;
+          nextIncreaseRadius = increaseRadius + 0.1;
+        }
+      } else {
+        nextLoaderRotateValue = prevState.loaderRotateValue - 0.15;
+        nextIncreaseRadius = prevState.increaseRadius + 5;
+      }
+
       return ({
-        needToAdd: needToAddNewValue,
         textAlpha: newTextAlpha,
+        needToAdd: needToAddNewValue,
+        startTwisting: !startTwisting && increaseRadius > maxTwistedValue ? true : prevState.startTwisting,
+        loaderRotateValue: nextLoaderRotateValue,
+        increaseRadius: nextIncreaseRadius,
+        startTwistingTime: startTwisting ? prevState.startTwistingTime + 1 : startTwistingTime,
+        animationPart: increaseRadius < 0 ? ANIMATION_PART.fourth : prevState.animationPart,
       });
     });
   };

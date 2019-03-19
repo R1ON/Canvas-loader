@@ -24,7 +24,7 @@ export const SECOND_ANIMATION = {
   loaderAcceleration: 1.1,
   loaderOffsetBetweenParts: 0.6,
   defaultRotateLoaderValue: Math.PI / 50,
-  slowdownRotate: 0.001,
+  slowdownRotate: 0.0007,
   minLoaderRadius: 150,
   maxLoaderRadius: 200,
 
@@ -38,6 +38,10 @@ export const SECOND_ANIMATION = {
   minTextAlpha: 0.3,
   maxTextAlpha: 1,
   textAlphaSpeed: 0.008,
+};
+
+export const THIRD_ANIMATION = {
+  maxTwistedValue: 250,
 };
 
 export const COLORS = {
