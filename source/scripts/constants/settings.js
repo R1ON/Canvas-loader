@@ -42,6 +42,20 @@ export const SECOND_ANIMATION = {
 
 export const THIRD_ANIMATION = {
   maxTwistedValue: 250,
+  twistDuration: 20,
+  twistSpeedFirstPart: 0.15,
+  twistSpeedSecondPart: 0.005,
+  twistSpeedThirdPart: 0.2,
+  radiusSpeedFirstPart: 5,
+  radiusSpeedSecondPart: 0.1,
+  radiusSpeedThirdPart: 10,
+};
+
+export const FOURTH_ANIMATION = {
+  circleLineWidth: 4,
+  defaultClearCircleRadius: 0,
+  clearCircleRadiusSpeed: 1,
+  clearCircleRadiusAcceleration: 1.2,
 };
 
 export const COLORS = {

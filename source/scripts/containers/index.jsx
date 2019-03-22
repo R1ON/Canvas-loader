@@ -9,6 +9,7 @@ import {
   FIRST_ANIMATION,
   SECOND_ANIMATION,
   THIRD_ANIMATION,
+  FOURTH_ANIMATION,
   TEXT_INSIDE_LOADER,
   REDRAW_CANVAS_TIME,
 } from '../constants/settings';
@@ -18,7 +19,7 @@ class PageContainer extends PureComponent {
     super();
 
     this.canvas = createRef();
-    this.ratio = window.devicePixelRatio;
+    this.ratio = window.devicePixelRatio || 1;
 
     const width = window.innerWidth * this.ratio;
     const height = window.innerHeight * this.ratio;
@@ -33,6 +34,8 @@ class PageContainer extends PureComponent {
       minTextAlpha,
       defaultRotateLoaderValue,
     } = SECOND_ANIMATION;
+
+    const { defaultClearCircleRadius } = FOURTH_ANIMATION;
 
     this.state = {
       width, // canvas width
@@ -60,6 +63,8 @@ class PageContainer extends PureComponent {
 
       startTwisting: false,
       startTwistingTime: 0,
+
+      clearCircleRadius: defaultClearCircleRadius,
     };
 
     const drawCanvasWithThrottle = throttle(this.redrawCanvas, REDRAW_CANVAS_TIME);
@@ -110,15 +115,29 @@ class PageContainer extends PureComponent {
 
   rotateCanvas = () => {
     const {
-      width, height, rotateBackgroundValue, cancelAnimationFrame,
+      width,
+      height,
+      radius,
+      rotateBackgroundValue,
+      cancelAnimationFrame,
     } = this.state;
 
-    const { defaultRotateValue } = FIRST_ANIMATION;
+    const { defaultRotateValue, partLineWidth } = FIRST_ANIMATION;
 
     const halfWidth = width / 2;
     const halfHeight = height / 2;
 
-    this.ctx.clearRect(-this.deviceDiagonal, -this.deviceDiagonal, this.deviceDiagonal * 3, this.deviceDiagonal * 3);
+    this.ctx.beginPath();
+
+    this.ctx.save();
+
+    this.ctx.resetTransform();
+
+    this.ctx.arc(halfWidth, halfHeight, radius + partLineWidth, 0, Math.PI * 2);
+    this.ctx.clip();
+    this.ctx.clearRect(0, 0, width, height);
+
+    this.ctx.restore();
 
     this.ctx.translate(halfWidth, halfHeight);
 
@@ -186,7 +205,11 @@ class PageContainer extends PureComponent {
 
   drawLoader = (startAngle, endAngle) => {
     const {
-      width, height, loaderRadius, increaseRadius, startTwisting
+      width,
+      height,
+      loaderRadius,
+      increaseRadius,
+      startTwisting,
     } = this.state;
 
     const { white } = COLORS;
@@ -419,8 +442,19 @@ class PageContainer extends PureComponent {
       startTwisting,
       startTwistingTime,
     } = this.state;
+
     const { loaderOffsetBetweenParts } = SECOND_ANIMATION;
-    const { maxTwistedValue } = THIRD_ANIMATION;
+
+    const {
+      maxTwistedValue,
+      twistDuration,
+      twistSpeedFirstPart,
+      twistSpeedSecondPart,
+      twistSpeedThirdPart,
+      radiusSpeedFirstPart,
+      radiusSpeedSecondPart,
+      radiusSpeedThirdPart,
+    } = THIRD_ANIMATION;
 
     this.rotateLoader();
 
@@ -440,17 +474,23 @@ class PageContainer extends PureComponent {
       let nextLoaderRotateValue;
       let nextIncreaseRadius;
 
+      // TODO ENGLISH
+      // сначала круг увеличивается (radiusSpeedFirstPart),
+      // перед тем, как начать закручиваться внутрь, продолжает увеличиваться
+      // но с меньшей скоростью (radiusSpeedSecondPart)
+      // после уменьшается (radiusSpeedThirdPart)
+
       if (startTwisting) {
-        if (startTwistingTime > 20) {
-          nextLoaderRotateValue = loaderRotateValue + 0.2;
-          nextIncreaseRadius = increaseRadius - 10;
+        if (startTwistingTime > twistDuration) {
+          nextLoaderRotateValue = loaderRotateValue + twistSpeedThirdPart;
+          nextIncreaseRadius = increaseRadius - radiusSpeedThirdPart;
         } else {
-          nextLoaderRotateValue = loaderRotateValue - 0.005;
-          nextIncreaseRadius = increaseRadius + 0.1;
+          nextLoaderRotateValue = loaderRotateValue - twistSpeedSecondPart;
+          nextIncreaseRadius = increaseRadius + radiusSpeedSecondPart;
         }
       } else {
-        nextLoaderRotateValue = prevState.loaderRotateValue - 0.15;
-        nextIncreaseRadius = prevState.increaseRadius + 5;
+        nextLoaderRotateValue = prevState.loaderRotateValue - twistSpeedFirstPart;
+        nextIncreaseRadius = prevState.increaseRadius + radiusSpeedFirstPart;
       }
 
       return ({
@@ -460,9 +500,52 @@ class PageContainer extends PureComponent {
         loaderRotateValue: nextLoaderRotateValue,
         increaseRadius: nextIncreaseRadius,
         startTwistingTime: startTwisting ? prevState.startTwistingTime + 1 : startTwistingTime,
-        animationPart: increaseRadius < 0 ? ANIMATION_PART.fourth : prevState.animationPart,
+        animationPart: increaseRadius <= 0 ? ANIMATION_PART.fourth : prevState.animationPart,
       });
     });
+  };
+
+  fourthAnimationPart = () => {
+    const { width, height, clearCircleRadius } = this.state;
+
+    const { white } = COLORS;
+
+    const {
+      circleLineWidth,
+      clearCircleRadiusSpeed,
+      clearCircleRadiusAcceleration,
+    } = FOURTH_ANIMATION;
+
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+
+    if (clearCircleRadius >= this.deviceDiagonal) {
+      this.ctx.clearRect(0, 0, width, height);
+
+      return this.setState({ animationPart: null });
+    }
+
+    this.drawGradient();
+
+    this.ctx.beginPath();
+
+    this.ctx.save();
+
+    this.ctx.arc(halfWidth, halfHeight, clearCircleRadius, 0, Math.PI * 2);
+    this.ctx.clip();
+    this.ctx.clearRect(0, 0, width, height);
+
+    this.ctx.restore();
+
+    this.ctx.beginPath();
+    this.ctx.strokeStyle = white;
+    this.ctx.lineWidth = circleLineWidth;
+    this.ctx.arc(halfWidth, halfHeight, clearCircleRadius, 0, Math.PI * 2);
+    this.ctx.stroke();
+
+    return this.setState(prevState => ({
+      clearCircleRadius: (prevState.clearCircleRadius + clearCircleRadiusSpeed) * clearCircleRadiusAcceleration,
+    }));
   };
 
   drawAnimationParts = () => {
@@ -472,11 +555,12 @@ class PageContainer extends PureComponent {
       case ANIMATION_PART.first: this.firstAnimationPart(); break;
       case ANIMATION_PART.second: this.secondAnimationPart(); break;
       case ANIMATION_PART.third: this.thirdAnimationPart(); break;
+      case ANIMATION_PART.fourth: this.fourthAnimationPart(); break;
 
       default: break;
     }
 
-    if (animationPart !== ANIMATION_PART.fourth) {
+    if (animationPart) {
       const animationId = requestAnimationFrame(this.drawAnimationParts);
       this.setState({ animationId });
     }
